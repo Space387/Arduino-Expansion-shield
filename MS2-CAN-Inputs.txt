@@ -1,0 +1,63 @@
+#include <SPI.h>
+#include <mcp2515.h>   // https://github.com/autowp/arduino-mcp2515
+#include <MegaCAN.h>   // https://github.com/mantonakakis1/MegaCAN
+
+// ---- Analog input ----
+const int ANALOG_PIN = A0;   // <-- change to whichever pin you're using
+const int CS_PIN     = 10;
+
+// ---- MegaCAN setup ----
+// baseID MUST match "MY CAN ID" set in TunerStudio's CAN Parameters page
+const uint32_t baseID = 1512;   // <-- pick a value, set the SAME value in TunerStudio
+MegaCAN MegaCAN(baseID);
+
+MegaCAN_message_t recMsgMSC;    // stores parsed request from MS2
+MegaCAN_message_t respMsgMSC;   // stores our response, ready to send
+
+// ---- MCP2515 ----
+MCP2515 mcp2515(CS_PIN);
+struct can_frame receivedFrame;
+struct can_frame respFrame;
+
+void setup() {
+  Serial.begin(115200);
+  SPI.begin();
+
+  mcp2515.reset();
+  mcp2515.setBitrate(CAN_500KBPS, MCP_8MHZ);
+  mcp2515.setNormalMode();
+
+  Serial.println("MS2 GPIOADC responder online...");
+}
+
+void loop() {
+  if (mcp2515.readMessage(&receivedFrame) == MCP2515::ERROR_OK) {
+
+    // MS2's data requests use the extended (29-bit) CAN ID flag
+    if ((receivedFrame.can_id & CAN_EFF_FLAG) != 0) {
+
+      uint32_t msgCore = receivedFrame.can_id & CAN_EFF_MASK; // strip the flag bit before handing to the library
+
+      // Only the first 3 data bytes carry the request info (table/offset/length)
+      MegaCAN.processMSreq(msgCore, receivedFrame.data, recMsgMSC);
+
+      // Read your live analog value
+      uint16_t val = analogRead(ANALOG_PIN);  // 0-1023
+
+      // Build the response — same value repeated into all 4 slots for this ADC group
+      // (only the one you've mapped in TunerStudio will actually be used)
+      MegaCAN.setMSresp(recMsgMSC, respMsgMSC, val, val, val, val);
+
+      respFrame.can_id  = respMsgMSC.responseCore | CAN_EFF_FLAG;
+      respFrame.can_dlc = recMsgMSC.data.request.varByt; // number of bytes MS2 actually asked for
+      memcpy(respFrame.data, respMsgMSC.data.response, respFrame.can_dlc);
+
+      mcp2515.sendMessage(&respFrame);
+
+      Serial.print("Responded to MS2 request, offset=");
+      Serial.print(recMsgMSC.core.toOffset);
+      Serial.print(" val=");
+      Serial.println(val);
+    }
+  }
+}
