@@ -1,15 +1,14 @@
 # CAN Bus Expansion Shield for Megasquirt
 
-An Arduino expansion shield for building custom vehicle controller nodes on a Megasquirt CAN bus. Designed for the [Arduino Nano R4](https://store.arduino.cc/nano-r4) and built around the [MCP2515](https://ww1.microchip.com/downloads/aemDocuments/documents/APID/ProductDocuments/DataSheets/MCP2515-Stand-Alone-CAN-Controller-with-SPI-Interface-20001822J.pdf) CAN controller (SPI, 8 MHz crystal, 500 kbps).
+An Arduino expansion shield for building custom vehicle controller nodes on a Megasquirt CAN bus. Designed for the [Arduino Nano R4](https://store.arduino.cc/nano-r4) and built around the Nano's **native CAN controller** (500 kbps, no external CAN chip required).
 
 The board provides:
 
-- **8 analog inputs** (A0–A7) — temperature sensors, pressure transducers, potentiometers
-- **4 high-current PWM outputs** via onboard MOSFETs (D3, D6, D9, D10) — fan control, fuel pump, etc.
-- **3 medium-load digital outputs** (D8, D11, D12) — relays, solenoids, indicators
-- **2 protected 12V inputs** (D2, D7) — switch or signal detection
-- **MCP2515 CAN interface** — 500 kbps, SPI on hardware pins (CS on D10)
-- **SPI header** — access to the same SPI bus the MCP2515 uses, for daisy-chaining additional SPI devices
+- **A0–A7** — analog or digital sensor inputs with onboard pullup resistor slots
+- **D3, D6, D9, D10** — medium-load (5A) PWM switches via onboard MOSFETs
+- **D8, D11, D12, D13** — low-load (0.5A) switches
+- **D2, D7** — 12V detect inputs
+- **Native CAN interface** — 500 kbps via the Nano R4's built-in CAN controller (CAN_H/CAN_L on the shield terminal block)
 
 > **Note:** D0/D1 are available as basic on/off outputs but become non-functional if `Serial` is used for debug output.
 
@@ -44,11 +43,11 @@ Megasquirt can receive these as generic CAN inputs — map them in TunerStudio u
 
 ### Fan control
 
-Two-stage fan control with MOSFET outputs on D5 (low) and D6 (high). The logic combines Megasquirt CANOUT fan request bits with local AC pressure thresholds and vehicle speed — fans shut off above 40 mph since airflow handles cooling at speed.
+Two-stage fan control with MOSFET outputs on D3 (low) and D6 (high). The logic combines Megasquirt CANOUT fan request bits with local AC pressure thresholds and vehicle speed — fans shut off above 40 mph since airflow handles cooling at speed.
 
 ### Alternator control
 
-A relay output on D9 cuts alternator field charging during cranking, WOT pulls, steady-state cruise, and overvoltage conditions — reducing parasitic load when you need the power elsewhere. Safety floor prevents cut if battery voltage drops below 11.5V, and a 10-second time limit prevents continuous cut.
+A relay output on D9 cuts alternator field charging during cranking, WOT pulls, steady-state cruise, and overvoltage conditions — reducing parasitic load when you need the power elsewhere. Safety floor prevents cut if battery voltage drops below 12.4V, and a 10-second time limit prevents continuous cut.
 
 ### AC compressor control
 
@@ -62,13 +61,12 @@ Reads an AC request signal from Megasquirt (CAN ID 1500), monitors line pressure
 
 - CAN Bus Expansion Shield V3 (sold separately)
 - Arduino Nano R4 (not included with the board)
-- MCP2515 CAN controller with 8 MHz crystal (onboard)
 - Megasquirt-3 (or compatible) with CAN broadcast enabled at 500 kbps
 
 ### Software
 
-1. Install the [arduino-mcp2515](https://github.com/autowp/arduino-mcp2515) library by autowp (available in the Arduino Library Manager)
-2. Open `Corvette_Nano_CANBus_V5.ino` in the Arduino IDE
+1. Open `Corvette_Nano_CANBus_V5.ino` in the Arduino IDE
+2. The code uses the `Arduino_CAN.h` library — this is included with the Arduino Nano R4 board package (no separate library install needed)
 3. Review the pin declarations and CAN IDs at the top of the sketch — these map to specific Corvette C4 sensor locations and Megasquirt CAN IDs
 4. Modify pin assignments, thresholds, and CAN IDs to match your vehicle and Megasquirt configuration
 5. Upload to your Nano R4

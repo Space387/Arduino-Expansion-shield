@@ -5,22 +5,8 @@
 ===================================================================
 */
 
-#include <SPI.h>
-#include <mcp2515.h> // Library: "arduino-mcp2515" by autowp
+#include <Arduino_CAN.h> // Native R4 Core CAN library
 #include <math.h> // Required for Log() Functions
-
-/*Pin functions 
-A0-A7 - analog inputs
-D3, 5, 6, 9 - PWM through Mosfet
-D4, 7, 8 - Direct to Nano on/ off output
-D0, D1 are non functional if serial is called else Basic on/off
-
-Future pinouts for the V3 board
-A0-A7 Analog inputs
-D3, D6, D9, D10 - High load PWM 
-D8, D11, D12, D13 - Medium load non PWM
-D2, D7 - 12V inputs
-*/
 
 // Pin Declarations
 const int TEMP1_PIN  = A0;
@@ -29,9 +15,8 @@ const int PRESS1_PIN = A2;
 const int PRESS2_PIN = A3;
 const int PRESS3_PIN = A4; // AC Pressure Sensor (0.5V = 0 PSI, 4.5V = 438 PSI)
 const int TEMP3_PIN  = A5; // AC NTC Thermistor
-const int CS_PIN     = 10;
 
-const int FAN_LOW_PIN   = 5;  // Low-Speed MOSFET Output
+const int FAN_LOW_PIN   = 3;  // Low-Speed MOSFET Output
 const int FAN_HIGH_PIN  = 6;  // High-Speed MOSFET Output
 const int ALT_RELAY_PIN = 9;  // Alternator Cut Relay (Triggers High to Cut NC contacts)
 
@@ -57,7 +42,7 @@ const uint16_t CRUISE_MAP_MAX = 680;   // 68.0 kPa
 const uint16_t CRUISE_TPS_MAX = 180;   // 15.0% TPS
 const uint16_t DECEL_MAP_MAX  = 380;   // 38.0 kPa (Aggressive Lift-Off Zone)
 const uint16_t CRANK_RPM_MAX  = 400;   // Engine Cranking Window
-const uint16_t VOLT_LOW_SAFE  = 122;   // 11.5V Low Safety Floor
+const uint16_t VOLT_LOW_SAFE  = 124;   // 12.4V Low Safety Floor
 const uint16_t VOLT_HIGH_SAFE = 155;   // 15.5V Overcharge Safety Cut
 
 //=================AC control constants ===================
@@ -72,12 +57,6 @@ const uint16_t AC_PRESS_CUTOUT   = 375; // Maximum head pressure cutout
 const uint16_t AC_PRESS_CUTIN    = 325; // Re-engage at 325 PSI (375 - 50 hysteresis)
 const float    AC_TEMP_CUTOUT    = 33.0; // Freeze protection threshold
 const float    AC_TEMP_CUTIN     = 38.5; // Re-engage threshold (5.5°F hysteresis swing)
-
-MCP2515 mcp2515(CS_PIN);     
-
-struct can_frame canMsgOut1502;
-struct can_frame canMsgOut1503;
-struct can_frame canMsgIn;
 
 // Global tracking variables
 uint16_t engineRPM      = 0;
@@ -101,7 +80,6 @@ unsigned long lastTxTime  = 0;
 
 void setup() {
   Serial.begin(115200);
-  SPI.begin();
   
   pinMode(FAN_LOW_PIN, OUTPUT);
   pinMode(FAN_HIGH_PIN, OUTPUT);
@@ -114,17 +92,15 @@ void setup() {
 
   analogReadResolution(10);
   
-  mcp2515.reset();
-  mcp2515.setBitrate(CAN_500KBPS, MCP_8MHZ);
-  mcp2515.setNormalMode();
+  Serial.println("Connecting to Native Hardware CAN Bus Controller...");
   
-  Serial.println("MegaSquirt-3 Vehicle Control Network Online...");
-  
-  canMsgOut1502.can_id  = CAN_ID_1502;
-  canMsgOut1502.can_dlc = 8;
-  
-  canMsgOut1503.can_id  = CAN_ID_1503;
-  canMsgOut1503.can_dlc = 8;
+  // Official Native R4 CAN initialization syntax
+  if (CAN.begin(CanBitRate::BR_500k)) {
+    Serial.println("SUCCESS: Native 500KBPS Network Bus Initialized Cleanly!");
+  } else {
+    Serial.println("CRITICAL ERROR: Native CAN hardware system failed to register.");
+    while (1); 
+  }
 }
 
 void loop() {
@@ -137,14 +113,15 @@ void loop() {
   uint16_t rawPress3 = analogRead(PRESS3_PIN); 
   uint16_t rawTemp3  = analogRead(TEMP3_PIN);
   
-  // 1. Unified Local Transduction calculations (No duplicate maps)
   uint16_t clampedADC  = constrain(rawPress3, 102, 920);
   uint16_t scaledACPsi = map(clampedADC, 102, 920, 0, 438);
      
   // -------------------------------------------------------------------------
-  // 1. RECEIVE TRAFFIC: Passive Hex Grid Parsing
+  // 1. RECEIVE TRAFFIC: Native R4 Core CAN Method
   // -------------------------------------------------------------------------
-  while (mcp2515.readMessage(&canMsgIn) == MCP2515::ERROR_OK) {
+  while (CAN.available()) {
+    CanMsg canMsgIn = CAN.read(); // Correctly returns native CanMsg instance
+    
     if (canMsgIn.can_id == CCM_REALTIME_GRP00) {
       rawACRequest = (int16_t)((canMsgIn.data[0] << 8) | canMsgIn.data[1]);
     }
@@ -210,6 +187,7 @@ void loop() {
   bool voltageDroppedTooLow = (batteryVoltage <= VOLT_LOW_SAFE);
   bool continuousTimeLimit  = (isAltCutActive && (currentTime - altCutTimer >= 10000)); 
 
+  // BUG FIX: Included continuousTimeLimit bypass condition directly in state verification
   if ((isCranking || isWotPull || isSteadyCruise || isOvercharging) && !voltageDroppedTooLow && !continuousTimeLimit) {
     if (!isAltCutActive) {
       altCutTimer = currentTime; 
@@ -217,8 +195,14 @@ void loop() {
     }
     digitalWrite(ALT_RELAY_PIN, HIGH); 
   } else {
-    isAltCutActive = false;
-    digitalWrite(ALT_RELAY_PIN, LOW);  
+    // If the 10-second timer hits, force charging back on and reset tracking
+    if (continuousTimeLimit && (currentTime - altCutTimer < 15000)) {
+      // Force passive recovery mode for at least 5 seconds before allowing another cut
+      digitalWrite(ALT_RELAY_PIN, LOW);
+    } else {
+      isAltCutActive = false;
+      digitalWrite(ALT_RELAY_PIN, LOW);  
+    }
   }
 
   //---------------------AC Thermistor Calculation----------------------------------
@@ -246,57 +230,55 @@ void loop() {
   // -------------------------------------------------------------------------
   if (AC_REQUEST && engineRunning) {
     if (isCompressorOn) {
-      // If compressor is currently active, evaluate CUT-OUT boundaries
       if (scaledACPsi >= AC_PRESS_CUTOUT || temperatureFahrenheit <= AC_TEMP_CUTOUT) {
         isCompressorOn = false;
       }
     } else {
-      // If compressor is currently inactive, evaluate safe CUT-IN conditions
       if (scaledACPsi < AC_PRESS_CUTIN && temperatureFahrenheit >= AC_TEMP_CUTIN) {
         isCompressorOn = true;
       }
     }
   } else {
-    // Force compressor off instantly if there is no user request or if the engine stalls
     isCompressorOn = false;
   }
 
   // -------------------------------------------------------------------------
-  // 3. TRANSMIT TRAFFIC: Sensor Broadcast (10 Hz / 100ms)
+  // 3. TRANSMIT TRAFFIC: Sensor Broadcast (10 Hz / 100ms) - Native R4 Conversion
   // -------------------------------------------------------------------------
   if (currentTime - lastTxTime >= 100) {
     lastTxTime = currentTime;
 
-    // Build FRAME 1502 Data Pack
-    canMsgOut1502.data[0] = (rawTemp1 >> 8) & 0xFF;  
-    canMsgOut1502.data[1] = rawTemp1 & 0xFF;         
-    canMsgOut1502.data[2] = (rawTemp2 >> 8) & 0xFF;  
-    canMsgOut1502.data[3] = rawTemp2 & 0xFF;         
-    canMsgOut1502.data[4] = (rawPress1 >> 8) & 0xFF;  
-    canMsgOut1502.data[5] = rawPress1 & 0xFF;        
-    canMsgOut1502.data[6] = (rawPress2 >> 8) & 0xFF; 
-    canMsgOut1502.data[7] = rawPress2 & 0xFF;        
-    mcp2515.sendMessage(&canMsgOut1502);
+    // Allocate official native CanMsg structures locally
+    CanMsg txFrame1502;
+    txFrame1502.can_id = CAN_ID_1502;
+    txFrame1502.data_len = 8;
+    
+    txFrame1502.data[0] = (rawTemp1 >> 8) & 0xFF;  
+    txFrame1502.data[1] = rawTemp1 & 0xFF;         
+    txFrame1502.data[2] = (rawTemp2 >> 8) & 0xFF;  
+    txFrame1502.data[3] = rawTemp2 & 0xFF;         
+    txFrame1502.data[4] = (rawPress1 >> 8) & 0xFF;  
+    txFrame1502.data[5] = rawPress1 & 0xFF;        
+    txFrame1502.data[6] = (rawPress2 >> 8) & 0xFF; 
+    txFrame1502.data[7] = rawPress2 & 0xFF;        
+    CAN.write(txFrame1502); // Write frame out using native global object
 
-    // Build FRAME 1503 Data Pack (Optimized Payload Allocation)
-    // Send exact mapped PSI value scaled x10 over CAN (e.g. 1550 = 155.0 PSI)
+    CanMsg txFrame1503;
+    txFrame1503.can_id = CAN_ID_1503;
+    txFrame1503.data_len = 8;
+    
     uint16_t transmittedPsiX10 = scaledACPsi * 10;
-    canMsgOut1503.data[0] = (transmittedPsiX10 >> 8) & 0xFF; 
-    canMsgOut1503.data[1] = transmittedPsiX10 & 0xFF;        
+    txFrame1503.data[0] = (transmittedPsiX10 >> 8) & 0xFF; 
+    txFrame1503.data[1] = transmittedPsiX10 & 0xFF;        
     
-    // Byte 2 and 3 mapped for AC temprature
-    int16_t txTempx10 = temperatureFahrenheit *10;
-	  canMsgOut1503.data[2] = (txTempx10 >> 8) &0xFF;
-	  canMsgOut1503.data[3] = txTempx10 & 0xFF;
+    int16_t txTempx10 = temperatureFahrenheit * 10;
+    txFrame1503.data[2] = (txTempx10 >> 8) & 0xFF;
+    txFrame1503.data[3] = txTempx10 & 0xFF;
 	
-	  // Byte 2 acts as our real-time AC digital state command bit to MegaSquirt
-    canMsgOut1503.data[4] = isCompressorOn ? 0x01 : 0x00;
+    txFrame1503.data[4] = isCompressorOn ? 0x01 : 0x00;
 
-	
-    
-    // Flatten out remaining unused data array lines efficiently
-    for (int i = 5; i < 8; i++) { canMsgOut1503.data[i] = 0x00; }
-    mcp2515.sendMessage(&canMsgOut1503);
+    for (int i = 5; i < 8; i++) { txFrame1503.data[i] = 0x00; }
+    CAN.write(txFrame1503);
 
     // Debugging printouts
     Serial.print("Thermistor Resistance: "); Serial.print(thermistorResistance);
