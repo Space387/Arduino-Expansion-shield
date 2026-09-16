@@ -1,26 +1,44 @@
 # CAN Bus Expansion Shield for Megasquirt
 
-An Arduino expansion shield for building custom vehicle controller nodes on a Megasquirt CAN bus. Designed for the [Arduino Nano R4](https://store.arduino.cc/nano-r4) and built around the Nano's **native CAN controller** (500 kbps, no external CAN chip required).
+An Arduino expansion shield for building custom vehicle controller nodes on a Megasquirt CAN bus. Designed for the [Arduino Nano R4](https://store.arduino.cc/nano-r4) using the Nano's **native CAN controller** (500 kbps — no external CAN chip required).
 
-The board provides:
+## Board Hardware
 
-- **A0–A7** — analog or digital sensor inputs with onboard pullup resistor slots
-- **D3, D6, D9, D10** — medium-load (5A) PWM switches via onboard MOSFETs
-- **D8, D11, D12, D13** — low-load (0.5A) switches
-- **D2, D7** — 12V detect inputs
-- **Native CAN interface** — 500 kbps via the Nano R4's built-in CAN controller (CAN_H/CAN_L on the shield terminal block)
+The shield breaks out the Nano R4's pins into vehicle-grade connections:
+
+| Pin Group | Pins | Function |
+|-----------|------|----------|
+| Analog inputs | A0–A7 | Sensor inputs — temperature, pressure, potentiometers |
+| High-current PWM | D3, D6, D9, D10 | MOSFET outputs for fans, pumps, relays |
+| Low-current switches | D8, D11, D12, D13 | On/off control for lower-load devices |
+| 12V detect inputs | D2, D7 | High-frequency 12V inputs — hall sensors, switches |
+| CAN bus | — | Native R4 CAN at 500 kbps |
 
 > **Note:** D0/D1 are available as basic on/off outputs but become non-functional if `Serial` is used for debug output.
 
----
-
 ## Example Code
 
-The included `Corvette_Nano_CANBus_V5.ino` is a full working implementation from a 1990 Corvette C4 running Megasquirt-3. It demonstrates several common tasks the shield is built for:
+The included `Corvette_Nano_CANBus_V5.ino` is a full working implementation from a 1990 Corvette C4 running Megasquirt-3. It demonstrates how to use the shield as a custom vehicle controller.
 
-### Reading Megasquirt realtime data over CAN
+### Pins used in this example
 
-The code listens for Megasquirt realtime broadcast frames at 500 kbps and parses engine data:
+| Pin | Assignment | Type |
+|-----|-----------|------|
+| A0 | TEMP1 | Analog input |
+| A1 | TEMP2 | Analog input |
+| A2 | PRESS1 | Analog input |
+| A3 | PRESS2 | Analog input |
+| A4 | AC pressure sensor (0.5V–4.5V, 0–438 PSI) | Analog input |
+| A5 | AC NTC thermistor | Analog input |
+| D3 | Low-speed fan (MOSFET) | Digital output |
+| D6 | High-speed fan (MOSFET) | Digital output |
+| D9 | Alternator cut relay (MOSFET) | Digital output |
+
+The remaining analog inputs (A6–A7), low-current outputs (D8, D11–D13), and 12V detect inputs (D2, D7) are available on the board but not used in this example. Add them as your build requires.
+
+### What the code does
+
+**Receives Megasquirt realtime data over CAN:**
 
 | CAN ID | Megasquirt Group | Data Parsed |
 |--------|-----------------|------------|
@@ -30,64 +48,51 @@ The code listens for Megasquirt realtime broadcast frames at 500 kbps and parses
 | 1562 | Group 42 | Vehicle speed (bytes 0–1) |
 | 1572 | Group 52 | CANOUT bitfield — fan control bits from MS (byte 1) |
 
-These are standard Megasquirt-3 realtime CAN broadcast IDs. If you're running different CAN broadcast settings in TunerStudio, adjust the `MS_REALTIME_*` constants at the top of the sketch to match your configuration.
+If you're running different CAN broadcast settings in TunerStudio, adjust the `MS_REALTIME_*` constants at the top of the sketch to match.
 
-### Broadcasting sensor data back to the bus
+**Also receives from the CCM (custom controller module):**
 
-The shield transmits two custom CAN frames at 10 Hz (every 100 ms):
+| CAN ID | Data Parsed |
+|--------|------------|
+| 1500 | AC request signal (bytes 0–1) |
 
-- **CAN ID 1502** — four raw analog sensor values (two temperature, two pressure) packed as 16-bit integers
-- **CAN ID 1503** — AC line pressure (scaled ×10), AC evaporator temperature (scaled ×10), and the AC compressor command bit
+**Transmits sensor data back to the bus at 10 Hz:**
 
-Megasquirt can receive these as generic CAN inputs — map them in TunerStudio under CAN Remote Variables to use sensor data in your fuel/spark tables or output strategies.
+| CAN ID | Payload |
+|--------|---------|
+| 1502 | TEMP1, TEMP2, PRESS1, PRESS2 (raw ADC, 16-bit each) |
+| 1503 | AC pressure (PSI × 10), AC temperature (°F × 10), compressor status flag |
 
-### Fan control
+**Fan control** — Two-stage fan control with hysteresis. Reads MS CANOUT bits for ECU-driven fan requests and independently triggers on AC head pressure. Disables both fans above 40 MPH (forced airflow).
 
-Two-stage fan control with MOSFET outputs on D3 (low) and D6 (high). The logic combines Megasquirt CANOUT fan request bits with local AC pressure thresholds and vehicle speed — fans shut off above 40 mph since airflow handles cooling at speed.
+**Alternator control** — Cuts the alternator during cranking, WOT pulls, steady-state cruise, and overcharge conditions. Automatic 10-second cut timer with 5-second recovery lockout. Safety floor at 12.4V — if battery drops below, charging resumes regardless of other conditions.
 
-### Alternator control
-
-A relay output on D9 cuts alternator field charging during cranking, WOT pulls, steady-state cruise, and overvoltage conditions — reducing parasitic load when you need the power elsewhere. Safety floor prevents cut if battery voltage drops below 12.4V, and a 10-second time limit prevents continuous cut.
-
-### AC compressor control
-
-Reads an AC request signal from Megasquirt (CAN ID 1500), monitors line pressure and evaporator temperature via analog inputs, and cycles the compressor with hysteresis on both pressure (375 PSI cutout / 325 PSI cutin) and temperature (33°F freeze protection / 38.5°F re-engage). The compressor command is broadcast back to Megasquirt on CAN ID 1503.
-
----
+**AC compressor cycling** — Reads AC request from the CCM and cycles the compressor with pressure and temperature protections: high-pressure cutout at 375 PSI, freeze protection at 33°F, with OEM-style hysteresis bands on re-engagement.
 
 ## Getting Started
 
 ### Hardware
 
-- CAN Bus Expansion Shield V3 (sold separately)
-- Arduino Nano R4 (not included with the board)
-- Megasquirt-3 (or compatible) with CAN broadcast enabled at 500 kbps
+- Arduino Nano R4
+- CAN Bus Expansion Shield (V3)
+- Megasquirt-3 with CAN bus enabled at 500 kbps
+- CAN termination resistor (120Ω) at each end of the bus
 
 ### Software
 
-1. Open `Corvette_Nano_CANBus_V5.ino` in the Arduino IDE
-2. The code uses the `Arduino_CAN.h` library — this is included with the Arduino Nano R4 board package (no separate library install needed)
-3. Review the pin declarations and CAN IDs at the top of the sketch — these map to specific Corvette C4 sensor locations and Megasquirt CAN IDs
-4. Modify pin assignments, thresholds, and CAN IDs to match your vehicle and Megasquirt configuration
-5. Upload to your Nano R4
+1. Install the [Arduino IDE](https://www.arduino.cc/en/software) (2.x or later)
+2. Install the **Arduino Nano R4** board package — the `Arduino_CAN.h` library is included with the core, no separate install needed
+3. Open `Corvette_Nano_CANBus_V5.ino`
+4. Select **Arduino Nano R4** as your board
+5. Upload
 
 ### Adapting the code
 
-This example is purpose-built for a Corvette C4, but the patterns are reusable:
+The top of the sketch defines all pin assignments, CAN IDs, and control thresholds as constants. To adapt for your build:
 
-- **Pin assignments** — change the `*_PIN` constants to match how you've wired your sensors and outputs to the shield
-- **CAN IDs** — update the `MS_REALTIME_*` constants to match your Megasquirt CAN broadcast configuration in TunerStudio
-- **Thresholds** — fan temperatures, alternator cut parameters, and AC hysteresis values are all defined as constants at the top for easy adjustment
-- **Sensor scaling** — pressure and temperature conversions use standard formulas; replace with your sensor's calibration data
+- **Sensors on different pins** — change the `*_PIN` constants
+- **Different CAN broadcast IDs** — change the `MS_REALTIME_*` constants to match your TunerStudio configuration
+- **Different fan/alternator thresholds** — adjust the `WOT_*`, `CRUISE_*`, `VOLT_*`, and `AC_*` constants
+- **Add more inputs/outputs** — declare new pins from the unused board pins listed above
 
----
-
-## License
-
-This example code is provided as a starting point for purchasers of the CAN Bus Expansion Shield. Modify and adapt freely for your own projects.
-
----
-
-## About
-
-Designed and built by [Space387](https://github.com/Space387). Hardware available separately — this repository contains example firmware only.
+The example uses six analog inputs and three digital outputs. The board supports up to eight analog inputs, four high-current PWM outputs, four low-current switches, and two 12V detect inputs — wire what your vehicle needs and extend the code accordingly.
