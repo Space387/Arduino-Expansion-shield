@@ -12,7 +12,7 @@ The shield breaks out the Nano R4's pins into vehicle-grade connections:
 | High-current PWM | D3, D6, D9, D10 | MOSFET outputs for fans, pumps, relays |
 | Low-current switches | D8, D11, D12, D13 | On/off control for lower-load devices |
 | 12V detect inputs | D2, D7 | High-frequency 12V inputs — hall sensors, switches |
-| CAN bus | — | Native R4 CAN at 500 kbps |
+| CAN bus | D4,D5 | Native R4 CAN at 500 kbps |
 
 > **Note:** D0 and D1 are not broken out to the connector. The current board uses a 26-pin SuperSeal connector, and there aren't enough pins to accommodate them. D0/D1 are also the hardware serial lines, so they're unavailable if `Serial` is used for debug output. A future board revision may upgrade to a larger SuperSeal connector to bring these out — not confirmed yet.
 >
