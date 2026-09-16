@@ -26,11 +26,11 @@ The included `Corvette_Nano_CANBus_V5.ino` is a full working implementation from
 
 | Pin | Assignment | Type |
 |-----|-----------|------|
-| A0 | TEMP1 | Analog input |
-| A1 | TEMP2 | Analog input |
-| A2 | PRESS1 | Analog input |
-| A3 | PRESS2 | Analog input |
-| A4 | AC pressure sensor (0.5V–4.5V, 0–438 PSI) | Analog input |
+| A0 | TEMP1 (Fuel)| Analog input |
+| A1 | TEMP2 (Oil)  | Analog input |
+| A2 | PRESS1 (Fuel)| Digital input |
+| A3 | PRESS2 (Oil) | Digital input |
+| A4 | AC pressure sensor (0.5V–4.5V, 0–438 PSI) | Digital input |
 | A5 | AC NTC thermistor | Analog input |
 | D3 | Low-speed fan (MOSFET) | Digital output |
 | D6 | High-speed fan (MOSFET) | Digital output |
