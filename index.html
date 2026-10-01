@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nano CANBus Expansion Shield — Build Guide</title>
+<style>
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --surface2: #0f3460;
+  --accent: #e94560;
+  --text: #e0e0e0;
+  --muted: #8892a6;
+  --border: #2a2a4a;
+  --sensor: #4e8d7e;
+  --trigger: #c97b3f;
+  --switch: #7b6bc4;
+  --power: #c94f5a;
+  --can: #5b9fd6;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  padding: 0;
+}
+header {
+  background: var(--surface);
+  border-bottom: 2px solid var(--accent);
+  padding: 2rem 2rem 1.5rem;
+}
+header h1 { font-size: 1.8rem; margin-bottom: 0.3rem; }
+header p { color: var(--muted); font-size: 1rem; }
+nav {
+  background: var(--surface2);
+  padding: 0.8rem 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--border);
+}
+nav a {
+  color: var(--muted);
+  text-decoration: none;
+  margin-right: 1.5rem;
+  font-size: 0.9rem;
+  transition: color 0.2s;
+}
+nav a:hover { color: var(--accent); }
+main { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+section { margin-bottom: 3rem; }
+h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+h3 { font-size: 1.15rem; margin: 1.2rem 0 0.6rem; color: var(--accent); }
+p { margin-bottom: 0.8rem; }
+ul { margin: 0.5rem 0 0.8rem 1.5rem; }
+li { margin-bottom: 0.3rem; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+th, td {
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+  border: 1px solid var(--border);
+}
+th { background: var(--surface2); font-weight: 600; }
+tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+.note {
+  background: rgba(233,69,96,0.1);
+  border-left: 3px solid var(--accent);
+  padding: 0.8rem 1rem;
+  margin: 1rem 0;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.9rem;
+}
+.note-optional {
+  background: rgba(91,159,214,0.1);
+  border-left: 3px solid var(--can);
+  padding: 0.8rem 1rem;
+  margin: 1rem 0;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.9rem;
+}
+.warn {
+  background: rgba(201,79,90,0.15);
+  border-left: 3px solid var(--power);
+  padding: 0.8rem 1rem;
+  margin: 1rem 0;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Connector diagram */
+.connector-wrap {
+  display: flex;
+  gap: 3rem;
+  flex-wrap: wrap;
+  margin: 1.5rem 0;
+}
+.connector-view {
+  flex: 1;
+  min-width: 380px;
+}
+.connector-view h4 {
+  font-size: 0.95rem;
+  margin-bottom: 0.8rem;
+  color: var(--muted);
+}
+.connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 1rem;
+  background: var(--surface);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.key-bar {
+  display: flex;
+  justify-content: space-between;
+  width: 340px;
+  margin-bottom: 4px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.key-bar span { font-size: 0.65rem; }
+.key-bar.center { justify-content: center; }
+.pin-row {
+  display: flex;
+  gap: 0;
+  margin-bottom: 2px;
+}
+.pin-row.offset { padding-left: 20px; }
+.pin {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  margin: 0 1px;
+  border: 1px solid var(--border);
+  cursor: default;
+  transition: transform 0.15s;
+}
+.pin:hover { transform: scale(1.15); z-index: 5; position: relative; }
+.pin .pin-num { font-weight: bold; font-size: 0.65rem; color: var(--muted); }
+.pin .pin-assign { font-size: 0.6rem; }
+.pin.sensor { background: rgba(78,141,126,0.25); border-color: var(--sensor); }
+.pin.trigger { background: rgba(201,123,63,0.25); border-color: var(--trigger); }
+.pin.switch { background: rgba(123,107,196,0.25); border-color: var(--switch); }
+.pin.power { background: rgba(201,79,90,0.25); border-color: var(--power); }
+.pin.can { background: rgba(91,159,214,0.25); border-color: var(--can); }
+.pin.gnd { background: rgba(136,146,166,0.2); border-color: var(--muted); }
+
+.legend {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  font-size: 0.8rem;
+}
+.legend-item { display: flex; align-items: center; gap: 0.4rem; }
+.legend-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid; }
+
+.footnote { font-size: 0.8rem; color: var(--muted); font-style: italic; margin-top: 0.5rem; }
+code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px; font-size: 0.85em; }
+.tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.tag.req { background: rgba(201,79,90,0.2); color: var(--power); }
+.tag.opt { background: rgba(91,159,214,0.2); color: var(--can); }
+</style>
+</head>
+<body>
+<header>
+<h1>Nano CANBus Expansion Shield</h1>
+<p>Build guide for the V3 expansion board — Arduino Nano R4 with native CAN, distributed I/O for Megasquirt</p>
+</header>
+<nav>
+<a href="#overview">Overview</a>
+<a href="#bom">Bill of Materials</a>
+<a href="#parts">Parts by Connector Group</a>
+<a href="#assembly">Assembly</a>
+<a href="#pinout">Connector Pinout</a>
+</nav>
+<main>
+
+<section id="overview">
+<h2>Overview</h2>
+<p>The Nano CANBus Expansion Shield is a distributed I/O board for the C4 Corvette's CAN bus architecture. It mounts an Arduino Nano R4 (native CAN controller) and breaks out analog inputs, high-current PWM outputs, low-current switches, optoisolated inputs, and CAN bus through a sealed 26-pin TE SuperSeal connector. The board communicates with the Megasquirt ECU over CAN at 500 kbps.</p>
+<h3>Key Features</h3>
+<ul>
+<li>8 analog input channels with optional 4.7k&Omega; pullup and 0.1&micro;F filtering per channel</li>
+<li>4 high-current PWM outputs via IRLZ44N MOSFETs (fans, pumps, relays)</li>
+<li>4 low-current switch outputs via BS170 MOSFETs</li>
+<li>2 optoisolated digital inputs via PC817 optocouplers</li>
+<li>Native CAN bus (Nano R4) with 120&Omega; termination option</li>
+<li>Buck converter for 5V regulation from 12V vehicle power</li>
+<li>Sealed 26-pin TE SuperSeal connector for engine bay environments</li>
+</ul>
+</section>
+
+<section id="bom">
+<h2>Bill of Materials</h2>
+<p>Quantities below are <strong>per board</strong> (DigiKey order was for 3 boards). Line items match the DigiKey order; parts not in that order are listed separately.</p>
+
+<h3>Components from DigiKey Order</h3>
+<table>
+<tr>
+<th>#</th><th>DigiKey P/N</th><th>Mfr P/N</th><th>Description</th><th>Per Board</th><th>Designators</th><th>Notes</th>
+</tr>
+<tr>
+<td>1</td><td>445-FG28X7R1H104KNT00-ND</td><td>FG28X7R1H104KNT00</td><td>0.1&micro;F 50V X7R ceramic cap, radial</td><td>10</td><td>C1–C8, C10</td><td>9 assigned + 1 spare</td>
+</tr>
+<tr>
+<td>2</td><td>10-EEH-AZS1H221BCT-ND</td><td>EEH-AZS1H221B</td><td>220&micro;F 20% 50V hybrid polymer cap, TH</td><td>1</td><td>C9</td><td>Power filter — observe polarity</td>
+</tr>
+<tr>
+<td>3</td><td>1801-1N5819CT-ND</td><td>1N5819</td><td>Schottky diode 40V 1A, DO204AL</td><td>4</td><td>D1–D4</td><td>Flyback for IRLZ44N outputs</td>
+</tr>
+<tr>
+<td>4</td><td>1655-1N4148CT-ND</td><td>1N4148</td><td>Signal diode 75V 300mA, DO35</td><td>4</td><td>D5–D8</td><td>For BS170 outputs</td>
+</tr>
+<tr>
+<td>5</td><td>IRLZ44NPBF-ND</td><td>IRLZ44NPBF</td><td>N-ch MOSFET 55V 47A, TO-220AB</td><td>4</td><td>Q1–Q4</td><td>High-current PWM outputs</td>
+</tr>
+<tr>
+<td>6</td><td>BS170-ND</td><td>BS170</td><td>N-ch MOSFET 60V 500mA, TO-92-3</td><td>4</td><td>Q5–Q8</td><td>Low-current switch outputs</td>
+</tr>
+<tr>
+<td>7</td><td>CF14JT4K70CT-ND</td><td>CF14JT4K70</td><td>4.7k&Omega; 5% 1/4W axial resistor</td><td>10</td><td>R1–R8</td><td>8 assigned + 2 spare; <span class="tag opt">OPTIONAL</span></td>
+</tr>
+<tr>
+<td>8</td><td>CF14JT1K00CT-ND</td><td>CF14JT1K00</td><td>1k&Omega; 5% 1/4W axial resistor</td><td>10</td><td>R9–R16, R25–R26</td><td>Gate resistors + opto input limit</td>
+</tr>
+<tr>
+<td>9</td><td>CF14JT10K0CT-ND</td><td>CF14JT10K0</td><td>10k&Omega; 5% 1/4W axial resistor</td><td>10</td><td>R17–R24, R27–R28</td><td>Gate pull-downs + opto output pull-down</td>
+</tr>
+<tr>
+<td>10</td><td>S120CACT-ND</td><td>RNMF14FTC120R</td><td>120&Omega; 1% 1/4W axial resistor</td><td>1</td><td>R29</td><td>CAN termination; <span class="tag opt">CONDITIONAL</span></td>
+</tr>
+<tr>
+<td>11</td><td>PC817X2NSZ9F-ND</td><td>PC817X2NSZ9F</td><td>Optocoupler 5kV 1-ch, 4-DIP</td><td>2</td><td>U2, U3</td><td>Isolated digital inputs</td>
+</tr>
+<tr>
+<td>12</td><td>6473423-1-ND</td><td>6473423-1</td><td>Conn header R/A 26-pos 3mm (PCB)</td><td>1</td><td>J1 (board)</td><td>SuperSeal PCB header</td>
+</tr>
+<tr>
+<td>13</td><td>A104942-ND</td><td>1473416-1</td><td>Conn plug housing 26-pos SuperSeal</td><td>1</td><td>J1 (harness)</td><td>SuperSeal plug for harness</td>
+</tr>
+<tr>
+<td>14</td><td>A107346CT-ND</td><td>3-1447221-3</td><td>Socket contact 16-18AWG gold crimp</td><td>30</td><td>J1</td><td>26 needed + 4 spare</td>
+</tr>
+<tr>
+<td>15</td><td>A126083-ND</td><td>4-1437284-3</td><td>Cavity plug / seal cap</td><td>10</td><td>J1</td><td>Seal unused connector positions</td>
+</tr>
+</table>
+
+<h3>Additional Parts (not in DigiKey order)</h3>
+<table>
+<tr><th>Part</th><th>Designator</th><th>Notes</th></tr>
+<tr><td>Arduino Nano R4</td><td>—</td><td>Main controller, native CAN. Sourced separately.</td></tr>
+<tr><td>Buck converter module</td><td>U1</td><td>5V regulation from 12V vehicle supply. Sourced separately.</td></tr>
+<tr><td>CAN transceiver</td><td>J4</td><td>Physical CAN bus interface (e.g. MCP2551, SN65HVD230). Sourced separately.</td></tr>
+<tr><td>Optional: auxiliary headers</td><td>J2, J3</td><td>Analog and digital breakout headers if populated. Sourced separately.</td></tr>
+</table>
+
+<div class="note-optional">
+<strong>R1–R8 (4.7k&Omega;) — Optional, per channel:</strong> These pullup resistors are only needed when the channel is used with an unpowered sensor (1 or 2-wire temperature sensor). If the channel is used with a powered sensor (e.g. TPS with dedicated power, signal, and ground wires), the resistor should be omitted. Install per channel based on what's connected.
+</div>
+<div class="note-optional">
+<strong>R29 (120&Omega;) — Conditional:</strong> Install only if this board is the furthest node from the ECU on the CAN bus. If it is not the terminating node, omit this resistor. The CAN bus needs exactly two 120&Omega; terminators total — one at each physical end.
+</div>
+</section>
+
+<section id="parts">
+<h2>Parts by Connector Group</h2>
+<p>The 26-pin SuperSeal connector is organized into 4 physical rows (7, 6, 6, 7 pins). Each row serves a functional group. Below, components are listed with the connector pins they serve.</p>
+
+<h3>Row 1 — Sensor Signals (Pins 1–7)</h3>
+<p>Analog and digital sensor inputs, sensor power, and sensor ground. Analog inputs A0–A7 each have an optional 4.7k&Omega; pullup (R1–R8) and a 0.1&micro;F filter cap (C1–C8).</p>
+<table>
+<tr><th>Pin</th><th>Nano Pin</th><th>Signal</th><th>Components</th></tr>
+<tr><td>1</td><td>A7</td><td>Analog input</td><td>R8 (4.7k&Omega;, optional), C8 (0.1&micro;F)</td></tr>
+<tr><td>2</td><td>A3</td><td>Analog input</td><td>R4 (4.7k&Omega;, optional), C4 (0.1&micro;F)</td></tr>
+<tr><td>3</td><td>D7</td><td>Digital I/O</td><td>—</td></tr>
+<tr><td>4</td><td>D13</td><td>Digital I/O</td><td>—</td></tr>
+<tr><td>5</td><td>—</td><td>12V input</td><td>Raw vehicle supply in</td></tr>
+<tr><td>6</td><td>—</td><td>Sensor ground</td><td>—</td></tr>
+<tr><td>7</td><td>D10</td><td>PWM output</td><td>IRLZ44N (Q1–Q4 group), 1N5819 flyback (D1–D4), 1k&Omega; gate resistor, 10k&Omega; pull-down</td></tr>
+</table>
+
+<h3>Row 2 — 12V Triggers / 5A PWM (Pins 8–13)</h3>
+<p>High-current PWM outputs and CAN low. These channels drive IRLZ44N MOSFETs for loads like fans, pumps, and relays.</p>
+<table>
+<tr><th>Pin</th><th>Nano Pin</th><th>Signal</th><th>Components</th></tr>
+<tr><td>8</td><td>A6</td><td>Analog input / 5A PWM</td><td>R7 (4.7k&Omega;, optional), C7 (0.1&micro;F)</td></tr>
+<tr><td>9</td><td>A2</td><td>Analog input / 5A PWM</td><td>R3 (4.7k&Omega;, optional), C3 (0.1&micro;F)</td></tr>
+<tr><td>10</td><td>—</td><td>CAN Low</td><td>CAN transceiver (J4), C10 (0.1&micro;F decoupling), R29 (120&Omega;, conditional)</td></tr>
+<tr><td>11</td><td>D12</td><td>Digital I/O</td><td>—</td></tr>
+<tr><td>12</td><td>—</td><td>5V reference out</td><td>From buck converter (U1)</td></tr>
+<tr><td>13</td><td>D9</td><td>PWM output (5A)</td><td>IRLZ44N (Q1–Q4 group), 1N5819 flyback, 1k&Omega; gate resistor, 10k&Omega; pull-down</td></tr>
+</table>
+
+<h3>Row 3 — 1A Switch (Pins 14–19)</h3>
+<p>Low-current switch outputs via BS170 MOSFETs, CAN high, and digital I/O.</p>
+<table>
+<tr><th>Pin</th><th>Nano Pin</th><th>Signal</th><th>Components</th></tr>
+<tr><td>14</td><td>A5</td><td>Analog input</td><td>R6 (4.7k&Omega;, optional), C6 (0.1&micro;F)</td></tr>
+<tr><td>15</td><td>A1</td><td>Analog input</td><td>R2 (4.7k&Omega;, optional), C2 (0.1&micro;F)</td></tr>
+<tr><td>16</td><td>—</td><td>CAN High</td><td>CAN transceiver (J4), R29 (120&Omega;, conditional)</td></tr>
+<tr><td>17</td><td>D11</td><td>1A switch out</td><td>BS170 (Q5–Q8 group), 1N4148, 1k&Omega; gate resistor, 10k&Omega; pull-down</td></tr>
+<tr><td>18</td><td>D8</td><td>1A switch out</td><td>BS170 (Q5–Q8 group), 1N4148, 1k&Omega; gate resistor, 10k&Omega; pull-down</td></tr>
+<tr><td>19</td><td>D6</td><td>PWM output (5A)</td><td>IRLZ44N (Q1–Q4 group), 1N5819 flyback, 1k&Omega; gate resistor, 10k&Omega; pull-down</td></tr>
+</table>
+
+<h3>Row 4 — Power & Reference (Pins 20–26)</h3>
+<p>5V reference outputs, power grounds, and one digital output.</p>
+<table>
+<tr><th>Pin</th><th>Nano Pin</th><th>Signal</th><th>Components</th></tr>
+<tr><td>20</td><td>A4</td><td>Analog input</td><td>R5 (4.7k&Omega;, optional), C5 (0.1&micro;F)</td></tr>
+<tr><td>21</td><td>A0</td><td>Analog input</td><td>R1 (4.7k&Omega;, optional), C1 (0.1&micro;F)</td></tr>
+<tr><td>22</td><td>D2</td><td>Digital I/O</td><td>—</td></tr>
+<tr><td>23</td><td>—</td><td>Power ground</td><td>—</td></tr>
+<tr><td>24</td><td>—</td><td>Power ground</td><td>—</td></tr>
+<tr><td>25</td><td>—</td><td>Power ground</td><td>—</td></tr>
+<tr><td>26</td><td>D3</td><td>PWM output (5A)</td><td>IRLZ44N (Q1–Q4 group), 1N5819 flyback, 1k&Omega; gate resistor, 10k&Omega; pull-down</td></tr>
+</table>
+
+<h3>On-Board Only (not on SuperSeal)</h3>
+<table>
+<tr><th>Component</th><th>Designator</th><th>Function</th></tr>
+<tr><td>Buck converter</td><td>U1</td><td>5V regulation from 12V input (C9 220&micro;F on input)</td></tr>
+<tr><td>CAN transceiver</td><td>J4</td><td>CAN H/L physical interface (C10 decoupling, R29 termination)</td></tr>
+<tr><td>Optocoupler 1</td><td>U2</td><td>Isolated input (1k&Omega; current limit R25, 10k&Omega; pull-down R27)</td></tr>
+<tr><td>Optocoupler 2</td><td>U3</td><td>Isolated input (1k&Omega; current limit R26, 10k&Omega; pull-down R28)</td></tr>
+<tr><td>Arduino Nano R4</td><td>—</td><td>Main controller (native CAN on D4/D5)</td></tr>
+</table>
+
+<p class="footnote">Note: Resistor/cap designator-to-pin mappings above are inferred from standard design patterns (R1&rarr;A0, R2&rarr;A1, etc.) and the V3 pinout. Verify against your KiCad layout before finalizing.</p>
+</section>
+
+<section id="assembly">
+<h2>Assembly Instructions</h2>
+<p>General guidance for through-hole assembly. Verify component placement against your KiCad layout and silkscreen markings before soldering.</p>
+
+<h3>1. Resistors and Diodes (lowest profile first)</h3>
+<ul>
+<li><strong>R1–R8</strong> (4.7k&Omega;) — Install only for channels using unpowered sensors. For powered sensors (e.g. TPS), leave open. See note above.</li>
+<li><strong>R9–R16, R25–R26</strong> (1k&Omega;) — Gate resistors for MOSFETs and current-limiting for optocoupler inputs. Install all.</li>
+<li><strong>R17–R24, R27–R28</strong> (10k&Omega;) — Gate pull-downs and opto output pull-downs. Install all.</li>
+<li><strong>R29</strong> (120&Omega;) — CAN bus termination. Install only if this board is the furthest node from the ECU.</li>
+<li><strong>D1–D4</strong> (1N5819) — Schottky flyback diodes for IRLZ44N outputs. Install all. Observe polarity (cathode stripe toward load).</li>
+<li><strong>D5–D8</strong> (1N4148) — Signal diodes for BS170 outputs. Install all. Observe polarity (cathode stripe).</li>
+</ul>
+
+<h3>2. Capacitors</h3>
+<ul>
+<li><strong>C1–C8, C10</strong> (0.1&micro;F ceramic) — Input filter caps for analog channels and CAN transceiver decoupling. Non-polarized.</li>
+<li><strong>C9</strong> (220&micro;F hybrid polymer) — Power supply filter. <strong>Observe polarity</strong> — the negative terminal is marked. Install on the buck converter input side.</li>
+</ul>
+
+<h3>3. Semiconductors (note orientation)</h3>
+<ul>
+<li><strong>U2, U3</strong> (PC817 optocouplers, 4-DIP) — Align pin 1 (notch/dot) with silkscreen. The opto must be mounted on the <em>component side</em> of the board — confirm you're not reading the KiCad layout mirrored. Pin 1 is the anode (input+), pin 2 is cathode (input-), pin 3 is emitter (output), pin 4 is collector (output). Isolation depends on correct grounding: pin 2 (input ground) goes to <strong>power ground</strong>, not sensor ground.</li>
+<li><strong>Q5–Q8</strong> (BS170, TO-92) — Orient per silkscreen. Pinout: D, G, S (left to right, flat side facing you). Verify against your layout.</li>
+<li><strong>Q1–Q4</strong> (IRLZ44N, TO-220) — Mount with heatsink tab oriented per silkscreen. These are the high-current drivers — ensure good solder fillets on the drain and source pins. Pinout: G, D, S (left to right, tab facing you).</li>
+</ul>
+
+<div class="warn">
+<strong>Optoisolator grounding:</strong> The PC817 input ground (pin 2) must connect to <strong>power ground</strong>, not sensor ground. If pin 2 is tied to sensor ground, the isolation is defeated — 12V transients get a return path through the Nano. Verify this on your assembled board.
+</div>
+
+<h3>4. Power and CAN</h3>
+<ul>
+<li><strong>U1</strong> (Buck converter) — Install per module orientation. Input is 12V from the connector (pin 5), output is 5V to the Nano and 5VREF pin (pin 12). C9 (220&micro;F) is the input filter.</li>
+<li><strong>J4</strong> (CAN transceiver) — Interface between the Nano's native CAN (D4/D5) and the physical bus (CAN H on pin 16, CAN L on pin 10). C10 (0.1&micro;F) is decoupling. R29 (120&Omega;) goes across CAN H/L — only if terminating.</li>
+</ul>
+
+<h3>5. Connectors</h3>
+<ul>
+<li><strong>J1</strong> (6473423-1, SuperSeal R/A PCB header) — Solder the 26 through-hole pins. The right-angle body should sit flush against the board.</li>
+<li><strong>J2, J3</strong> (if populated) — Auxiliary analog and digital headers. Optional — populate if you need debug/breakout access.</li>
+</ul>
+
+<h3>6. Arduino Nano R4</h3>
+<ul>
+<li>Install via male/female headers or direct solder. If using female headers, the Nano can be removed for programming. If direct-soldered, program via the USB connector before final enclosure installation.</li>
+<li>The Nano R4's native CAN controller uses D4 (CTX) and D5 (CRX). These are not broken out to the SuperSeal — they connect internally to J4 (transceiver).</li>
+</ul>
+
+<h3>7. Harness Assembly</h3>
+<ul>
+<li>Crimp socket contacts (3-1447221-3) onto 16-18AWG wires using a proper ratcheting crimp tool.</li>
+<li>Insert contacts into the SuperSeal plug housing (1473416-1) until they click. Pull gently to confirm retention.</li>
+<li>Install cavity plugs (4-1437284-3) into any unused connector positions to maintain the IP67 seal.</li>
+<li>Route CAN H and CAN L as a twisted pair (minimum 1 twist per inch) for noise immunity.</li>
+</ul>
+</section>
+
+<section id="pinout">
+<h2>Connector Pinout</h2>
+<p>The TE SuperSeal 26-pin connector (1473416-1 plug / 6473423-1 header) has 4 rows in a 7-6-6-7 arrangement. Pin numbering runs left to right, top to bottom.</p>
+
+<div class="legend">
+<div class="legend-item"><div class="legend-swatch" style="background:rgba(78,141,126,0.25);border-color:var(--sensor)"></div>Sensor / Analog</div>
+<div class="legend-item"><div class="legend-swatch" style="background:rgba(201,123,63,0.25);border-color:var(--trigger)"></div>12V Trigger / 5A PWM</div>
+<div class="legend-item"><div class="legend-swatch" style="background:rgba(123,107,196,0.25);border-color:var(--switch)"></div>1A Switch</div>
+<div class="legend-item"><div class="legend-swatch" style="background:rgba(201,79,90,0.25);border-color:var(--power)"></div>Power / 5V Ref</div>
+<div class="legend-item"><div class="legend-swatch" style="background:rgba(91,159,214,0.25);border-color:var(--can)"></div>CAN Bus</div>
+<div class="legend-item"><div class="legend-swatch" style="background:rgba(136,146,166,0.2);border-color:var(--muted)"></div>Ground</div>
+</div>
+
+<div class="connector-wrap">
+
+<!-- View 1: Board Header, Mating Side -->
+<div class="connector-view">
+<h4>Board Header (6473423-1) — Mating Side</h4>
+<p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem;">Looking at the header from where the plug connects (pin side, facing you)</p>
+<div class="connector">
+<div class="key-bar"><span>◤ Key</span><span>Key ◢</span></div>
+<div class="pin-row">
+<div class="pin sensor"><span class="pin-num">1</span><span class="pin-assign">A7</span></div>
+<div class="pin sensor"><span class="pin-num">2</span><span class="pin-assign">A3</span></div>
+<div class="pin sensor"><span class="pin-num">3</span><span class="pin-assign">D7</span></div>
+<div class="pin sensor"><span class="pin-num">4</span><span class="pin-assign">D13</span></div>
+<div class="pin power"><span class="pin-num">5</span><span class="pin-assign">12VIN</span></div>
+<div class="pin gnd"><span class="pin-num">6</span><span class="pin-assign">SGND</span></div>
+<div class="pin trigger"><span class="pin-num">7</span><span class="pin-assign">D10</span></div>
+</div>
+<div class="pin-row offset">
+<div class="pin trigger"><span class="pin-num">8</span><span class="pin-assign">A6</span></div>
+<div class="pin trigger"><span class="pin-num">9</span><span class="pin-assign">A2</span></div>
+<div class="pin can"><span class="pin-num">10</span><span class="pin-assign">CAN L</span></div>
+<div class="pin trigger"><span class="pin-num">11</span><span class="pin-assign">D12</span></div>
+<div class="pin power"><span class="pin-num">12</span><span class="pin-assign">5VREF</span></div>
+<div class="pin trigger"><span class="pin-num">13</span><span class="pin-assign">D9</span></div>
+</div>
+<div class="pin-row offset">
+<div class="pin switch"><span class="pin-num">14</span><span class="pin-assign">A5</span></div>
+<div class="pin switch"><span class="pin-num">15</span><span class="pin-assign">A1</span></div>
+<div class="pin can"><span class="pin-num">16</span><span class="pin-assign">CAN H</span></div>
+<div class="pin switch"><span class="pin-num">17</span><span class="pin-assign">D11</span></div>
+<div class="pin switch"><span class="pin-num">18</span><span class="pin-assign">D8</span></div>
+<div class="pin trigger"><span class="pin-num">19</span><span class="pin-assign">D6</span></div>
+</div>
+<div class="pin-row">
+<div class="pin power"><span class="pin-num">20</span><span class="pin-assign">A4</span></div>
+<div class="pin power"><span class="pin-num">21</span><span class="pin-assign">A0</span></div>
+<div class="pin power"><span class="pin-num">22</span><span class="pin-assign">D2</span></div>
+<div class="pin gnd"><span class="pin-num">23</span><span class="pin-assign">PGND</span></div>
+<div class="pin gnd"><span class="pin-num">24</span><span class="pin-assign">PGND</span></div>
+<div class="pin gnd"><span class="pin-num">25</span><span class="pin-assign">PGND</span></div>
+<div class="pin trigger"><span class="pin-num">26</span><span class="pin-assign">D3</span></div>
+</div>
+<div class="key-bar center"><span>◣ Key ◢</span></div>
+</div>
+</div>
+
+<!-- View 2: Harness Plug, Wire Side -->
+<div class="connector-view">
+<h4>Harness Plug (1473416-1) — Wire Side</h4>
+<p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem;">Looking at the plug from the wire entry side (mirrored left-to-right from mating side)</p>
+<div class="connector">
+<div class="key-bar"><span>◢ Key</span><span>Key ◣</span></div>
+<div class="pin-row">
+<div class="pin trigger"><span class="pin-num">7</span><span class="pin-assign">D10</span></div>
+<div class="pin gnd"><span class="pin-num">6</span><span class="pin-assign">SGND</span></div>
+<div class="pin power"><span class="pin-num">5</span><span class="pin-assign">12VIN</span></div>
+<div class="pin sensor"><span class="pin-num">4</span><span class="pin-assign">D13</span></div>
+<div class="pin sensor"><span class="pin-num">3</span><span class="pin-assign">D7</span></div>
+<div class="pin sensor"><span class="pin-num">2</span><span class="pin-assign">A3</span></div>
+<div class="pin sensor"><span class="pin-num">1</span><span class="pin-assign">A7</span></div>
+</div>
+<div class="pin-row offset">
+<div class="pin trigger"><span class="pin-num">13</span><span class="pin-assign">D9</span></div>
+<div class="pin power"><span class="pin-num">12</span><span class="pin-assign">5VREF</span></div>
+<div class="pin trigger"><span class="pin-num">11</span><span class="pin-assign">D12</span></div>
+<div class="pin can"><span class="pin-num">10</span><span class="pin-assign">CAN L</span></div>
+<div class="pin trigger"><span class="pin-num">9</span><span class="pin-assign">A2</span></div>
+<div class="pin trigger"><span class="pin-num">8</span><span class="pin-assign">A6</span></div>
+</div>
+<div class="pin-row offset">
+<div class="pin trigger"><span class="pin-num">19</span><span class="pin-assign">D6</span></div>
+<div class="pin switch"><span class="pin-num">18</span><span class="pin-assign">D8</span></div>
+<div class="pin switch"><span class="pin-num">17</span><span class="pin-assign">D11</span></div>
+<div class="pin can"><span class="pin-num">16</span><span class="pin-assign">CAN H</span></div>
+<div class="pin switch"><span class="pin-num">15</span><span class="pin-assign">A1</span></div>
+<div class="pin switch"><span class="pin-num">14</span><span class="pin-assign">A5</span></div>
+</div>
+<div class="pin-row">
+<div class="pin trigger"><span class="pin-num">26</span><span class="pin-assign">D3</span></div>
+<div class="pin gnd"><span class="pin-num">25</span><span class="pin-assign">PGND</span></div>
+<div class="pin gnd"><span class="pin-num">24</span><span class="pin-assign">PGND</span></div>
+<div class="pin gnd"><span class="pin-num">23</span><span class="pin-assign">PGND</span></div>
+<div class="pin power"><span class="pin-num">22</span><span class="pin-assign">D2</span></div>
+<div class="pin power"><span class="pin-num">21</span><span class="pin-assign">A0</span></div>
+<div class="pin power"><span class="pin-num">20</span><span class="pin-assign">A4</span></div>
+</div>
+<div class="key-bar center"><span>◤ Key ◢</span></div>
+</div>
+</div>
+
+</div>
+
+<p class="footnote">Pin numbering follows TE SuperSeal convention: top-left is pin 1, left to right across each row, top to bottom. The harness-side view is mirrored horizontally from the mating-side view — verify pin numbers against the molded markings on the connector body. Keying: two features on top outer edges, one on bottom center.</p>
+
+<h3>Full Pinout Table</h3>
+<table>
+<tr><th>Pin</th><th>Nano Pin</th><th>Signal</th><th>Group</th><th>Direction</th></tr>
+<tr><td>1</td><td>A7</td><td>Analog input</td><td>Sensor</td><td>Input</td></tr>
+<tr><td>2</td><td>A3</td><td>Analog input</td><td>Sensor</td><td>Input</td></tr>
+<tr><td>3</td><td>D7</td><td>Digital I/O</td><td>Sensor</td><td>I/O</td></tr>
+<tr><td>4</td><td>D13</td><td>Digital I/O</td><td>Sensor</td><td>I/O</td></tr>
+<tr><td>5</td><td>—</td><td>12V input</td><td>Power</td><td>Input</td></tr>
+<tr><td>6</td><td>—</td><td>Sensor ground</td><td>Ground</td><td>—</td></tr>
+<tr><td>7</td><td>D10</td><td>PWM output (5A)</td><td>12V Trigger</td><td>Output</td></tr>
+<tr><td>8</td><td>A6</td><td>Analog input</td><td>12V Trigger</td><td>Input</td></tr>
+<tr><td>9</td><td>A2</td><td>Analog input</td><td>12V Trigger</td><td>Input</td></tr>
+<tr><td>10</td><td>—</td><td>CAN Low</td><td>CAN</td><td>Bus</td></tr>
+<tr><td>11</td><td>D12</td><td>Digital I/O</td><td>12V Trigger</td><td>I/O</td></tr>
+<tr><td>12</td><td>—</td><td>5V reference out</td><td>Power</td><td>Output</td></tr>
+<tr><td>13</td><td>D9</td><td>PWM output (5A)</td><td>12V Trigger</td><td>Output</td></tr>
+<tr><td>14</td><td>A5</td><td>Analog input</td><td>1A Switch</td><td>Input</td></tr>
+<tr><td>15</td><td>A1</td><td>Analog input</td><td>1A Switch</td><td>Input</td></tr>
+<tr><td>16</td><td>—</td><td>CAN High</td><td>CAN</td><td>Bus</td></tr>
+<tr><td>17</td><td>D11</td><td>1A switch output</td><td>1A Switch</td><td>Output</td></tr>
+<tr><td>18</td><td>D8</td><td>1A switch output</td><td>1A Switch</td><td>Output</td></tr>
+<tr><td>19</td><td>D6</td><td>PWM output (5A)</td><td>12V Trigger</td><td>Output</td></tr>
+<tr><td>20</td><td>A4</td><td>Analog input</td><td>Power / Ref</td><td>Input</td></tr>
+<tr><td>21</td><td>A0</td><td>Analog input</td><td>Power / Ref</td><td>Input</td></tr>
+<tr><td>22</td><td>D2</td><td>Digital I/O</td><td>Power / Ref</td><td>I/O</td></tr>
+<tr><td>23</td><td>—</td><td>Power ground</td><td>Ground</td><td>—</td></tr>
+<tr><td>24</td><td>—</td><td>Power ground</td><td>Ground</td><td>—</td></tr>
+<tr><td>25</td><td>—</td><td>Power ground</td><td>Ground</td><td>—</td></tr>
+<tr><td>26</td><td>D3</td><td>PWM output (5A)</td><td>Power / Ref</td><td>Output</td></tr>
+</table>
+
+</section>
+
+</main>
+</body>
+</html>
