@@ -244,10 +244,6 @@ code{background:var(--surface2);padding:2px 6px;border-radius:3px;font-size:0.85
 <p><strong>Sensor Ground (pin 6) — zero reference only. NOT a power ground.</strong> This is the clean ground reference for the analog sensors. It does not carry current — it exists so the Nano's ADC has a stable 0V reference. Do NOT tie sensor ground to the engine ground (pins 23-25). Do NOT tie it to the ECU power ground. Keeping these separate is what prevents PWM switching noise from corrupting analog sensor readings.</p>
 </div>
 
-<div class="warn">
-<p><strong>Optocoupler grounding:</strong> The 12V/frequency detect inputs (pins 3 and 22) use PC817 optocouplers for isolation. The input side of each opto is referenced to the vehicle 12V/ground — do NOT tie the opto input ground to the sensor ground (pin 6) or the engine ground (pins 23-25). Keep the grounds separate.</p>
-</div>
-
 <h2 id="assembly">Assembly Instructions</h2>
 <p>Solder from lowest profile to highest. This prevents taller components from getting in the way while you work.</p>
 
