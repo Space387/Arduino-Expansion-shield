@@ -141,7 +141,7 @@ code{background:var(--surface2);padding:2px 6px;border-radius:3px;font-size:0.85
 <div class="legend-item"><div class="legend-swatch legend-can"></div>CAN Bus</div>
 <div class="legend-item"><div class="legend-swatch legend-switch"></div>0.5A Switch</div>
 <div class="legend-item"><div class="legend-swatch legend-pwm"></div>5A PWM Switch</div>
-<div class="legend-item"><div class="legend-swatch legend-pwmgnd"></div>PWM Ground</div>
+<div class="legend-item"><div class="legend-swatch legend-pwmgnd"></div>Engine Ground</div>
 <div class="legend-item"><div class="legend-swatch legend-12v"></div>12V</div>
 <div class="legend-item"><div class="legend-swatch legend-5v"></div>5V Reference</div>
 <div class="legend-item"><div class="legend-swatch legend-sensgnd"></div>Sensor Ground</div>
@@ -183,9 +183,9 @@ code{background:var(--surface2);padding:2px 6px;border-radius:3px;font-size:0.85
 <div class="pin pin-sensor"><span class="num">20</span><span class="nano">A4</span><span class="func">Sensor</span></div>
 <div class="pin pin-sensor"><span class="num">21</span><span class="nano">A0</span><span class="func">Sensor</span></div>
 <div class="pin pin-detect"><span class="num">22</span><span class="nano">D2</span><span class="func">12V Detect</span></div>
-<div class="pin pin-pwmgnd"><span class="num">23</span><span class="nano">PWR GND</span><span class="func">PWM GND</span></div>
-<div class="pin pin-pwmgnd"><span class="num">24</span><span class="nano">PWR GND</span><span class="func">PWM GND</span></div>
-<div class="pin pin-pwmgnd"><span class="num">25</span><span class="nano">PWR GND</span><span class="func">PWM GND</span></div>
+<div class="pin pin-pwmgnd"><span class="num">23</span><span class="nano">PWR GND</span><span class="func">Eng GND</span></div>
+<div class="pin pin-pwmgnd"><span class="num">24</span><span class="nano">PWR GND</span><span class="func">Eng GND</span></div>
+<div class="pin pin-pwmgnd"><span class="num">25</span><span class="nano">PWR GND</span><span class="func">Eng GND</span></div>
 <div class="pin pin-pwm"><span class="num">26</span><span class="nano">D3</span><span class="func">5A PWM</span></div>
 </div>
 </div>
@@ -216,9 +216,9 @@ code{background:var(--surface2);padding:2px 6px;border-radius:3px;font-size:0.85
 <tr><td>20</td><td>A4</td><td class="func-sensor">Sensor</td><td>Analog sensor input</td></tr>
 <tr><td>21</td><td>A0</td><td class="func-sensor">Sensor</td><td>Analog sensor input</td></tr>
 <tr><td>22</td><td>D2</td><td class="func-detect">12V / Frequency Detect</td><td>Hall sensor, frequency input, 12V detect</td></tr>
-<tr><td>23</td><td>PWR GND</td><td class="func-pwmgnd">PWM Ground</td><td>High-current ground return for PWM outputs</td></tr>
-<tr><td>24</td><td>PWR GND</td><td class="func-pwmgnd">PWM Ground</td><td>High-current ground return for PWM outputs</td></tr>
-<tr><td>25</td><td>PWR GND</td><td class="func-pwmgnd">PWM Ground</td><td>High-current ground return for PWM outputs</td></tr>
+<tr><td>23</td><td>PWR GND</td><td class="func-pwmgnd">Engine Ground</td><td>High-current ground return for PWM outputs</td></tr>
+<tr><td>24</td><td>PWR GND</td><td class="func-pwmgnd">Engine Ground</td><td>High-current ground return for PWM outputs</td></tr>
+<tr><td>25</td><td>PWR GND</td><td class="func-pwmgnd">Engine Ground</td><td>High-current ground return for PWM outputs</td></tr>
 <tr><td>26</td><td>D3</td><td class="func-pwm">5A PWM Switch</td><td>High-current PWM output via IRLZ44N</td></tr>
 </table>
 
@@ -230,14 +230,14 @@ code{background:var(--surface2);padding:2px 6px;border-radius:3px;font-size:0.85
 <tr><td class="func-can">CAN Bus</td><td>10, 16</td><td>2</td><td>CAN transceiver + R29 termination</td></tr>
 <tr><td class="func-switch">0.5A Switch</td><td>4, 11, 17, 18</td><td>4</td><td>BS170 MOSFET (Q5–Q8)</td></tr>
 <tr><td class="func-pwm">5A PWM Switch</td><td>7, 13, 19, 26</td><td>4</td><td>IRLZ44N MOSFET (Q1–Q4)</td></tr>
-<tr><td class="func-pwmgnd">PWM Ground</td><td>23, 24, 25</td><td>3</td><td>High-current ground return</td></tr>
+<tr><td class="func-pwmgnd">Engine Ground</td><td>23, 24, 25</td><td>3</td><td>High-current ground return</td></tr>
 <tr><td class="func-12v">12V Supply</td><td>5</td><td>1</td><td>Buck converter input</td></tr>
 <tr><td class="func-5v">5V Reference</td><td>12</td><td>1</td><td>Buck converter output</td></tr>
 <tr><td class="func-sensgnd">Sensor Ground</td><td>6</td><td>1</td><td>Clean ground for analog reference</td></tr>
 </table>
 
 <div class="warn">
-<p><strong>Optocoupler grounding:</strong> The 12V/frequency detect inputs (pins 3 and 22) use PC817 optocouplers for isolation. The input side of each opto is referenced to the vehicle 12V/ground — do NOT tie the opto input ground to the sensor ground (pin 6) or the PWM ground (pins 23-25). Keep the grounds separate.</p>
+<p><strong>Optocoupler grounding:</strong> The 12V/frequency detect inputs (pins 3 and 22) use PC817 optocouplers for isolation. The input side of each opto is referenced to the vehicle 12V/ground — do NOT tie the opto input ground to the sensor ground (pin 6) or the engine ground (pins 23-25). Keep the grounds separate.</p>
 </div>
 
 <h2 id="assembly">Assembly Instructions</h2>
