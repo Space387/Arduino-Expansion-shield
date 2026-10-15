@@ -306,34 +306,107 @@ code{background:var(--surface2);padding:2px 6px;border-radius:3px;font-size:0.85
 </div>
 
 <h2 id="firmware">Firmware Reference</h2>
-<p>The repo includes <code>Corvette_Nano_CANBus_V5.ino</code> — a working implementation from a 1990 C4 Corvette running Megasquirt-3. It demonstrates how to use the shield as a custom vehicle controller node on the CAN bus.</p>
+<p>The repo includes <code>Corvette_Nano_CANBus_V6.7.ino</code> — a full working implementation from a 1990 C4 Corvette running Megasquirt-3. It demonstrates how to use the shield as a custom vehicle controller node on the CAN bus.</p>
 
-<h3>Pins Used in V5 Example</h3>
+<h3>Pins Used in V6.7 Example</h3>
 <table>
 <tr><th>Nano Pin</th><th>Connector Pin</th><th>Assignment</th><th>Type</th></tr>
-<tr><td>A0</td><td>21</td><td>TEMP1 (Fuel)</td><td>Analog input</td></tr>
-<tr><td>A1</td><td>15</td><td>TEMP2 (Oil)</td><td>Analog input</td></tr>
-<tr><td>A2</td><td>9</td><td>PRESS1 (Fuel)</td><td>Analog input</td></tr>
-<tr><td>A3</td><td>2</td><td>PRESS2 (Oil)</td><td>Analog input</td></tr>
-<tr><td>A4</td><td>20</td><td>AC pressure sensor (0.5V–4.5V, 0–438 PSI)</td><td>Analog input</td></tr>
-<tr><td>A5</td><td>14</td><td>AC NTC thermistor</td><td>Analog input</td></tr>
-<tr><td>D3</td><td>26</td><td>Low-speed fan (MOSFET)</td><td>5A PWM</td></tr>
-<tr><td>D6</td><td>19</td><td>High-speed fan (MOSFET)</td><td>5A PWM</td></tr>
-<tr><td>D9</td><td>13</td><td>Fuel pump (MOSFET)</td><td>5A PWM</td></tr>
-<tr><td>D10</td><td>7</td><td>AC compressor clutch (MOSFET)</td><td>5A PWM</td></tr>
+<tr><td>A0</td><td>21</td><td>TEMP1 — Fuel temp</td><td>Analog input</td></tr>
+<tr><td>A1</td><td>15</td><td>TEMP2 — Oil temp</td><td>Analog input</td></tr>
+<tr><td>A2</td><td>9</td><td>PRESS1 — Fuel pressure</td><td>Analog input</td></tr>
+<tr><td>A3</td><td>2</td><td>PRESS2 — Oil pressure</td><td>Analog input</td></tr>
+<tr><td>A4</td><td>20</td><td>PRESS3 — AC pressure (0.5V–4.5V, 0–438 PSI)</td><td>Analog input</td></tr>
+<tr><td>A5</td><td>14</td><td>TEMP3 — AC evap temp (NTC thermistor, 10kΩ β3950)</td><td>Analog input</td></tr>
+<tr><td>D8</td><td>18</td><td>Low-speed fan (MOSFET)</td><td>0.5A Switch</td></tr>
+<tr><td>D10</td><td>7</td><td>AC compressor clutch (IRLZ44N direct drive)</td><td>5A PWM</td></tr>
+<tr><td>D11</td><td>17</td><td>High-speed fan (MOSFET)</td><td>0.5A Switch</td></tr>
 <tr><td>D4, D5</td><td>16, 10</td><td>CAN bus (TX/RX)</td><td>CAN 500 kbps</td></tr>
 </table>
 
-<h3>CAN Bus IDs</h3>
+<div class="note">
+<p>Fans moved from the 5A PWM outputs (D3, D6) to the 0.5A switch outputs (D8, D11) — fan relays draw minimal coil current, so the BS170 MOSFETs are sufficient and the IRLZ44N outputs are freed for higher-load duties. The AC compressor clutch is driven directly by an IRLZ44N on D10, no relay.</p>
+</div>
+
+<h3>CAN Bus Traffic</h3>
+
+<h4>Inbound (received)</h4>
 <table>
-<tr><th>CAN ID</th><th>Direction</th><th>Data</th></tr>
-<tr><td>0x100</td><td>RX</td><td>Engine temp, oil pressure, fuel pressure (from MS3)</td></tr>
-<tr><td>0x200</td><td>TX</td><td>Fan status, fuel pump status, AC compressor status</td></tr>
-<tr><td>0x300</td><td>RX</td><td>AC pressure, AC temp (from MS3 or sensors)</td></tr>
+<tr><th>CAN ID</th><th>Source</th><th>Data Parsed</th></tr>
+<tr><td>1500</td><td>CCM</td><td>AC request signal (bytes 0–1)</td></tr>
+<tr><td>1520</td><td>MS3 Group 00</td><td>RPM (bytes 6–7)</td></tr>
+<tr><td>1522</td><td>MS3 Group 02</td><td>MAP (bytes 2–3), CLT (bytes 6–7)</td></tr>
+<tr><td>1523</td><td>MS3 Group 03</td><td>TPS (bytes 0–1), Battery voltage (bytes 2–3)</td></tr>
+<tr><td>1562</td><td>MS3 Group 42</td><td>Vehicle speed (bytes 0–1)</td></tr>
+<tr><td>1572</td><td>MS3 Group 52</td><td>CANOUT bitfield — fan control bits (byte 1)</td></tr>
+</table>
+
+<h4>Outbound (transmitted at 10 Hz)</h4>
+<table>
+<tr><th>CAN ID</th><th>Payload</th></tr>
+<tr><td>1502</td><td>Fuel temp, oil temp, fuel pressure, oil pressure (raw ADC, 16-bit each)</td></tr>
+<tr><td>1503</td><td>AC pressure (PSI × 10), AC evap temp (°F × 10), compressor status flag</td></tr>
+<tr><td>1511</td><td>Inter-module failure registry — sensor and system fault bitfields (see below)</td></tr>
+</table>
+
+<div class="note">
+<p>If you're running different CAN broadcast settings in TunerStudio, adjust the <code>MS_REALTIME_*</code> constants at the top of the sketch to match.</p>
+</div>
+
+<h3>1511 Failure Registry</h3>
+<p>CAN ID 1511 is the inter-module diagnostic broadcast. The CCM reads these bytes to populate the DIC failure list on the dash display. Two bytes, ten flags:</p>
+
+<h4>data[0] — Sensor Fault Byte</h4>
+<table>
+<tr><th>Bit</th><th>Flag</th><th>Sensor</th></tr>
+<tr><td>0</td><td>Fuel temp sensor fault</td><td>TEMP1 (A0)</td></tr>
+<tr><td>1</td><td>Oil temp sensor fault</td><td>TEMP2 (A1)</td></tr>
+<tr><td>2</td><td>Fuel pressure sensor fault</td><td>PRESS1 (A2)</td></tr>
+<tr><td>3</td><td>Oil pressure sensor fault</td><td>PRESS2 (A3)</td></tr>
+<tr><td>4</td><td>AC pressure sensor fault</td><td>PRESS3 (A4)</td></tr>
+<tr><td>5</td><td>Evap temp sensor fault</td><td>TEMP3 (A5)</td></tr>
+<tr><td>6–7</td><td>Spare</td><td>—</td></tr>
+</table>
+
+<h4>data[1] — System Fault Byte</h4>
+<table>
+<tr><th>Bit</th><th>Flag</th><th>Description</th></tr>
+<tr><td>0</td><td>CAN timeout</td><td>No inbound CAN for >1s while engine running</td></tr>
+<tr><td>1</td><td>Clutch engagement failure</td><td>Compressor commanded on, no ≥15 PSI pressure rise within 5s (after 2s clutch settle). Latches OFF until fresh AC request.</td></tr>
+<tr><td>2</td><td>Evap temp no response</td><td>Compressor on >12s, evap temp never dropped ≥2°F. Advisory — no action.</td></tr>
+<tr><td>3</td><td>Repeated high-pressure trip</td><td>>2 high-pressure cutouts in a rolling 30s window. Pattern flag — points at fans, condenser airflow, or overcharge. Advisory.</td></tr>
+<tr><td>4–7</td><td>Spare</td><td>—</td></tr>
+</table>
+
+<div class="note">
+<p>Sensor faults are detected by open/short monitoring — ADC reads ≤25 (short to ground) or ≥1000 (open circuit) set the corresponding bit. System faults clear automatically when conditions return to normal, except the clutch engagement fault which latches until the driver drops and re-raises the AC request.</p>
+</div>
+
+<h3>What the Code Does</h3>
+
+<p><strong>AC compressor protection</strong> — Two-stage safety tree. Tree 1 checks mechanical and external constraints (AC request active, engine running, TPS <70%, RPM <2200, CAN data fresh, clutch engagement proven). Tree 2 checks thermal and fluid constraints (CLT <235°F, evap temp >34°F, head pressure <375 PSI, thermistor healthy). All must pass for the compressor to engage. OEM-style hysteresis bands on every cutout/re-engagement pair. A 5-second minimum off-time prevents short cycling. A CAN watchdog kills the compressor locally if network data goes stale — no running on frozen values.</p>
+
+<p><strong>AC output-failure diagnostics</strong> — Watches the compressor after the safety tree commands it and verifies the system actually responded. Three flags:</p>
+<ul>
+<li><em>Clutch engagement failure</em> — on each compressor rising edge, captures head pressure baseline. After a 2-second clutch settle, requires ≥15 PSI rise within 5 seconds. Failure kills the compressor and latches until the driver re-requests AC. Skipped if the AC pressure sensor itself is faulted.</li>
+<li><em>Evap temp no response</em> — compressor on past 12 seconds and evap temp hasn't dropped 2°F from its engage baseline. Advisory only.</li>
+<li><em>Repeated high-pressure trip</em> — tracks the last three high-pressure cutout events in a rolling 30-second window. Three trips in the window sets the flag. Advisory only — the safety tree already protects on each individual trip.</li>
+</ul>
+
+<p><strong>Fan control</strong> — Two-stage fan control with hysteresis. Reads MS CANOUT bits for ECU-driven fan requests and independently triggers on AC head pressure. Disables both fans above 40 MPH (forced airflow).</p>
+
+<p><strong>Sensor fault monitoring</strong> — All six analog inputs checked each loop for open/short conditions. Faults are packed into the sensor fault byte and broadcast on 1511 for the CCM to display.</p>
+
+<h3>Version History</h3>
+<table>
+<tr><th>Version</th><th>Key Changes</th></tr>
+<tr><td>V6.7</td><td>AC output-failure diagnostics (clutch engagement, evap response, HP cycling). 1511 failure registry with 10 flags. CLT overheat moved to internal-only. CAN write retry with timeout.</td></tr>
+<tr><td>V6.6</td><td>Single analogRead per pin per loop. CAN timeout acts locally in safety tree. AC relay renamed to clutch (IRLZ44N direct drive).</td></tr>
+<tr><td>V6.5</td><td>Sensor fault monitoring. 1511 diagnostic broadcast. CAN watchdog.</td></tr>
+<tr><td>V5</td><td>Original release. Fan control, alternator cut, AC cycling, sensor telemetry.</td></tr>
 </table>
 
 <div class="footer">
-<p>Nano CANBus Expansion Shield V3 — Build Guide. Data from DigiKey order, TE SuperSeal 1.0 datasheet (ENG-DS-1-1773962-8-A), Corvette Wiring spreadsheet V3 SS26 pinout, and Corvette_Nano_CANBus_V5.ino.</p>
+<p>Nano CANBus Expansion Shield V3 — Build Guide. Data from DigiKey order, TE SuperSeal 1.0 datasheet (ENG-DS-1-1773962-8-A), Corvette Wiring spreadsheet V3 SS26 pinout, and Corvette_Nano_CANBus_V6.7.ino.</p>
 </div>
 
 </body>
