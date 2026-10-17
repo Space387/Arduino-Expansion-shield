@@ -159,18 +159,16 @@ void processACSafetyTrees(uint16_t scaledACPsi, unsigned long currentTime) {
   else if (engineRPM <= AC_RPM_CUTIN)   rpmSafetyTripped = false;
 
   // CAN WATCHDOG: stale network data kills the compressor locally.
-  // Without this, a CAN drop freezes RPM/TPS/engineRunning at their
-  // last values and the compressor runs on stale data.
-  if (canTimedOut) {
-    tpsSafetyTripped = true;
-    rpmSafetyTripped = true;
-  }
+  // canTimedOut is checked directly in externalTreePassed — it no
+  // longer forces tpsSafetyTripped/rpmSafetyTripped, so the diagnostic
+  // print only shows conditions that actually triggered.
 
   // A proven-dead clutch stays out until the driver drops and re-raises
   // the AC request — one retry per fresh demand, not a 5s hammer loop.
   if (!acRequestActive) clutchEngageFault = false;
 
   bool externalTreePassed = (acRequestActive && engineRunning &&
+                             !canTimedOut &&
                              !tpsSafetyTripped && !rpmSafetyTripped &&
                              !clutchEngageFault);
 
@@ -208,7 +206,11 @@ void processACSafetyTrees(uint16_t scaledACPsi, unsigned long currentTime) {
 
     if (!isCompressorOn) {
       Serial.println("  TRIPPED BY CAUSE:");
-      if (canTimedOut)         Serial.println("    - CAN Timeout (Network Data Stale >1s)");
+      if (canTimedOut) {
+        Serial.print("    - CAN Timeout (Stale ");
+        Serial.print((currentTime - lastIncomingCANTime) / 1000.0, 1);
+        Serial.println("s)");
+      }
       if (!acRequestActive)    Serial.println("    - Dashboard Request Absent");
       if (!engineRunning)      Serial.println("    - Engine Below Run Threshold (<500 RPM)");
       if (tpsSafetyTripped)    Serial.println("    - TPS Cutout (>70% WOT Protection)");
