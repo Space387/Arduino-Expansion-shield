@@ -167,10 +167,11 @@ void processACSafetyTrees(uint16_t scaledACPsi, unsigned long currentTime) {
   // the AC request — one retry per fresh demand, not a 5s hammer loop.
   if (!acRequestActive) clutchEngageFault = false;
 
+  // DIAGNOSTIC MODE: canTimedOut and clutchEngageFault are observed
+  // and broadcast on 1511 but no longer kill the compressor — we need
+  // to see whether CAN recovers on its own while the clutch stays engaged.
   bool externalTreePassed = (acRequestActive && engineRunning &&
-                             !canTimedOut &&
-                             !tpsSafetyTripped && !rpmSafetyTripped &&
-                             !clutchEngageFault);
+                             !tpsSafetyTripped && !rpmSafetyTripped);
 
   // TREE 2: THERMAL & FLUID SAFETY CONSTRAINTS
   if (engineCLT >= CLT_SAFETY_CUTOUT)        cltSafetyTripped = true;
@@ -206,11 +207,9 @@ void processACSafetyTrees(uint16_t scaledACPsi, unsigned long currentTime) {
 
     if (!isCompressorOn) {
       Serial.println("  TRIPPED BY CAUSE:");
-      if (canTimedOut) {
-        Serial.print("    - CAN Timeout (Stale ");
-        Serial.print((currentTime - lastIncomingCANTime) / 1000.0, 1);
-        Serial.println("s)");
-      }
+      // Note: CAN timeout and clutch engage fault no longer appear here
+      // because they no longer kill the compressor (diagnostic mode).
+      // They are still broadcast on 1511 and visible in Sys Flags.
       if (!acRequestActive)    Serial.println("    - Dashboard Request Absent");
       if (!engineRunning)      Serial.println("    - Engine Below Run Threshold (<500 RPM)");
       if (tpsSafetyTripped)    Serial.println("    - TPS Cutout (>70% WOT Protection)");
@@ -258,9 +257,7 @@ void processACDiagnostics(uint16_t scaledACPsi, unsigned long currentTime) {
       (currentTime - compressorEngageTime) > (ENGAGE_SETTLE_MS + ENGAGE_WINDOW_MS) &&
       scaledACPsi < (engageBaselinePsi + ENGAGE_MIN_RISE_PSI)) {
     clutchEngageFault = true;
-    isCompressorOn    = false;
-    compressorOffTime = currentTime;
-    Serial.println("!!! AC DIAGNOSTIC: Clutch commanded but no pressure rise — compressor killed");
+    Serial.println("!!! AC DIAGNOSTIC: Clutch commanded but no pressure rise (flag only — compressor not killed)");
   }
 
   // ---- FLAG: EVAP TEMP NO RESPONSE (advisory) ----
